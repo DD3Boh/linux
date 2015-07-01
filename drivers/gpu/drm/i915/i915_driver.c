@@ -858,6 +858,8 @@ int i915_driver_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (!i915->params.nuclear_pageflip && DISPLAY_VER(i915) < 5)
 		i915->drm.driver_features &= ~DRIVER_ATOMIC;
 
+	i915->quick_modeset = true;
+
 	ret = pci_enable_device(pdev);
 	if (ret)
 		goto out_fini;
@@ -869,6 +871,7 @@ int i915_driver_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	disable_rpm_wakeref_asserts(&i915->runtime_pm);
 
 	intel_vgpu_detect(i915);
+
 
 	ret = intel_gt_probe_all(i915);
 	if (ret < 0)
