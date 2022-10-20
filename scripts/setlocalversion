@@ -111,6 +111,15 @@ scm_version()
 	fi
 }
 
+incremental_version()
+{
+	if [ -r .version ]; then
+		printf $(expr 0$(cat .version))
+	else
+		printf 0
+	fi
+}
+
 collect_files()
 {
 	local file res=
@@ -156,6 +165,9 @@ config_localversion=$(sed -n 's/^CONFIG_LOCALVERSION=\(.*\)$/\1/p' include/confi
 if grep -q "^CONFIG_LOCALVERSION_AUTO=y$" include/config/auto.conf; then
 	# full scm version string
 	scm_version="$(scm_version)"
+elif grep -q "^CONFIG_LOCALVERSION_INCREMENTAL=y$" include/config/auto.conf; then
+	# Append .version to local version
+	scm_version="$res-$(incremental_version)"
 elif [ "${LOCALVERSION+set}" != "set" ]; then
 	# If the variable LOCALVERSION is not set, append a plus
 	# sign if the repository is not in a clean annotated or
