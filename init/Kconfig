@@ -233,6 +233,16 @@ config LOCALVERSION_AUTO
 
 	  which is done within the script "scripts/setlocalversion".)
 
+config LOCALVERSION_INCREMENTAL
+	bool "Automatically append revision number to the version string"
+	default n
+	depends on !COMPILE_TEST
+	help
+	  This will try to automatically determine the local kernel revision
+	  by checking the .version file in the output directory
+
+	  This is done in the script "scripts/setlocalversion"
+
 config BUILD_SALT
 	string "Build ID Salt"
 	default ""
