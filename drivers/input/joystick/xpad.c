@@ -800,6 +800,7 @@ static void xpad360_poweroff_work(struct work_struct *work) {
 	struct usb_xpad *xpad = container_of(work, struct usb_xpad, poweroff_work);
 
 	if (xpad->idata[3] & 0x04) {
+		printk("Inside the idata 4 if\n");
 		if (xpad->mode_btn_down_ts == 0)
 			xpad->mode_btn_down_ts = ktime_get_seconds();
 
@@ -811,6 +812,7 @@ static void xpad360_poweroff_work(struct work_struct *work) {
 			return;
 		}
 	} else {
+		printk("Resetting mode_btn_down_ts to 0");
 		xpad->mode_btn_down_ts = 0;
 	}
 
@@ -1623,6 +1625,7 @@ static int xpad360w_start_input(struct usb_xpad *xpad)
 		return error;
 	}
 
+	printk("Initing poweroff_work and scheduling it");
 	INIT_WORK(&xpad->poweroff_work, xpad360_poweroff_work);
 	schedule_work(&xpad->poweroff_work);
 
