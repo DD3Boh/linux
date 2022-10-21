@@ -635,7 +635,9 @@ struct usb_xpad {
 	int pad_nr;			/* the order x360 pads were attached */
 	const char *name;		/* name of the device */
 	struct work_struct work;	/* init/remove device from callback */
+	struct work_struct mode_work; /* work struct for mode button pressing */
 	time64_t mode_btn_down_ts;
+	bool mode_pressed;
 };
 
 static int xpad_init_input(struct usb_xpad *xpad);
@@ -796,19 +798,13 @@ static void xpad360_process_packet(struct usb_xpad *xpad, struct input_dev *dev,
 
 	/* XBOX360W controllers can't be turned off without driver assistance */
 	if (xpad->xtype == XTYPE_XBOX360W) {
-		if (xpad->mode_btn_down_ts > 0 && xpad->pad_present &&
+		if (xpad->mode_pressed && xpad->pad_present &&
 		    ((ktime_get_seconds() - xpad->mode_btn_down_ts) >=
 		     XPAD360W_POWEROFF_TIMEOUT)) {
 			xpad360w_poweroff_controller(xpad);
 			xpad->mode_btn_down_ts = 0;
 			return;
 		}
-
-		/* mode button down/up */
-		if (data[3] & 0x04)
-			xpad->mode_btn_down_ts = ktime_get_seconds();
-		else
-			xpad->mode_btn_down_ts = 0;
 	}
 }
 
@@ -826,6 +822,9 @@ static void xpad_presence_work(struct work_struct *work)
 		} else {
 			rcu_assign_pointer(xpad->x360w_dev, xpad->dev);
 		}
+
+		INIT_WORK(&xpad->mode_work, xpad_mode_work);
+		schedule_work(&xpad->mode_work);
 	} else {
 		RCU_INIT_POINTER(xpad->x360w_dev, NULL);
 		synchronize_rcu();
@@ -835,6 +834,22 @@ static void xpad_presence_work(struct work_struct *work)
 		 */
 		xpad_deinit_input(xpad);
 	}
+}
+
+static void xpad_mode_work(struct work_struct *work)
+{
+	struct usb_xpad *xpad = container_of(work, struct usb_xpad, mode_work);
+
+	if (xpad->idata[3] & 0x04) {
+		if (xpad->mode_btn_down_ts == 0)
+			xpad->mode_btn_down_ts = ktime_get_seconds();
+		xpad->mode_pressed = true;
+	} else {
+		xpad->mode_btn_down_ts = 0;
+		xpad->mode_pressed = false;
+	}
+
+	schedule_work(&xpad->mode_work);
 }
 
 /*
