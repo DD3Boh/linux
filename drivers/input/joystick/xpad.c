@@ -96,7 +96,7 @@
 /* Send power-off packet to xpad360w after holding the mode button for this many
  * seconds
  */
-#define XPAD360W_POWEROFF_TIMEOUT 5
+#define XPAD360W_POWEROFF_TIMEOUT 3
 
 #define PKT_XB              0
 #define PKT_XBE1            1
@@ -710,6 +710,7 @@ struct usb_xpad {
 	int pad_nr;			/* the order x360 pads were attached */
 	const char *name;		/* name of the device */
 	struct work_struct work;	/* init/remove device from callback */
+	struct delayed_work poweroff_work; /* work struct for poweroff on mode long press */
 	time64_t mode_btn_down_ts;
 };
 
@@ -872,20 +873,30 @@ static void xpad360_process_packet(struct usb_xpad *xpad, struct input_dev *dev,
 
 	/* XBOX360W controllers can't be turned off without driver assistance */
 	if (xpad->xtype == XTYPE_XBOX360W) {
-		if (xpad->mode_btn_down_ts > 0 && xpad->pad_present &&
-		    ((ktime_get_seconds() - xpad->mode_btn_down_ts) >=
-		     XPAD360W_POWEROFF_TIMEOUT)) {
-			xpad360w_poweroff_controller(xpad);
-			xpad->mode_btn_down_ts = 0;
-			return;
-		}
-
 		/* mode button down/up */
-		if (data[3] & BIT(2))
-			xpad->mode_btn_down_ts = ktime_get_seconds();
-		else
-			xpad->mode_btn_down_ts = 0;
+		if (data[3] & BIT(2)) {
+			if (xpad->mode_btn_down_ts == 0)
+				xpad->mode_btn_down_ts = ktime_get_seconds();
+
+			schedule_delayed_work(&xpad->poweroff_work, 0);
+		} else
+				xpad->mode_btn_down_ts = 0;
 	}
+}
+
+static void xpad360w_poweroff_work(struct work_struct *work) {
+	struct usb_xpad *xpad = container_of(to_delayed_work(work), struct usb_xpad, poweroff_work);
+
+	if (xpad->mode_btn_down_ts == 0)
+		return;
+
+	if ((ktime_get_seconds() - xpad->mode_btn_down_ts) >= XPAD360W_POWEROFF_TIMEOUT) {
+		xpad360w_poweroff_controller(xpad);
+		xpad->mode_btn_down_ts = 0;
+		return;
+	}
+
+	schedule_delayed_work(&xpad->poweroff_work, msecs_to_jiffies(200));
 }
 
 static void xpad_presence_work(struct work_struct *work)
@@ -1780,6 +1791,8 @@ static int xpad360w_start_input(struct usb_xpad *xpad)
 		return error;
 	}
 
+	INIT_DELAYED_WORK(&xpad->poweroff_work, xpad360w_poweroff_work);
+
 	return 0;
 }
 
@@ -1789,6 +1802,7 @@ static void xpad360w_stop_input(struct usb_xpad *xpad)
 
 	/* Make sure we are done with presence work if it was scheduled */
 	flush_work(&xpad->work);
+	flush_delayed_work(&xpad->poweroff_work);
 }
 
 static int xpad_open(struct input_dev *dev)
