@@ -717,6 +717,15 @@ config CHARGER_BQ256XX
 	  charge management and system power path management devices for single
 	  cell Li-ion and Li-polymer batteries.
 
+config CHARGER_BQ2589X
+	tristate "TI BQ2589X battery charger support"
+	depends on I2C && GPIOLIB
+	help
+	  Say Y to enable support for the TI BQ2589X battery charger.
+	  bq2589x driver supports bq25890/bq25892/bq25895 series chip.
+	  but some configuration and parameters are different, so we
+	  need note specific difference between the chips.
+
 config CHARGER_SMB347
 	tristate "Summit Microelectronics SMB3XX Battery Charger"
 	depends on I2C
