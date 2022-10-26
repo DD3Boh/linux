@@ -226,6 +226,7 @@ config SND_SOC_ALL_CODECS
 	imply SND_SOC_TAS6424
 	imply SND_SOC_TDA7419
 	imply SND_SOC_TFA9879
+	imply SND_SOC_TFA98xx
 	imply SND_SOC_TFA989X
 	imply SND_SOC_TLV320ADC3XXX
 	imply SND_SOC_TLV320ADCX140
@@ -2097,6 +2098,10 @@ config SND_SOC_NAU8824
 config SND_SOC_NAU8825
 	tristate
 	depends on I2C
+
+config SND_SOC_TFA98xx
+	tristate "NXP Smart PA TFA98xx"
+	default n
 
 config SND_SOC_TPA6130A2
 	tristate "Texas Instruments TPA6130A2 headphone amplifier"
