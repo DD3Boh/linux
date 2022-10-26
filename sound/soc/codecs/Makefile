@@ -68,17 +68,8 @@ snd-soc-cs42l42-objs := cs42l42.o
 snd-soc-cs42l51-objs := cs42l51.o
 snd-soc-cs42l51-i2c-objs := cs42l51-i2c.o
 snd-soc-cs42l52-objs := cs42l52.o
-<<<<<<< HEAD
 snd-soc-cs42l56-objs := cs42l56.o
-=======
-snd-soc-rt56xx-objs := rt56xx_ioctl.o
-snd-soc-rt5640-objs := rt5640.o rt5640_ioctl.o
-snd-soc-rt5642-objs := rt5640.o rt5640-dsp.o rt5640_ioctl.o
-snd-soc-rt5651-objs := rt5651.o rt5651_ioctl.o
-snd-soc-rt5659-objs := rt5659.o
-snd-soc-rt5672-objs := rt5670.o rt5670-dsp.o rt5670_ioctl.o rt_codec_ioctl.o
 snd-soc-tfa98xx-objs := tfa98xx.o tfa_container.o tfa_dsp.o
->>>>>>> 1b02223e853c (Import sound changes for latte)
 snd-soc-cs42l73-objs := cs42l73.o
 snd-soc-cs4234-objs := cs4234.o
 snd-soc-cs4265-objs := cs4265.o
@@ -414,7 +405,6 @@ obj-$(CONFIG_SND_SOC_AW8738)	+= snd-soc-aw8738.o
 obj-$(CONFIG_SND_SOC_BD28623)	+= snd-soc-bd28623.o
 obj-$(CONFIG_SND_SOC_BT_SCO)	+= snd-soc-bt-sco.o
 obj-$(CONFIG_SND_SOC_CQ0093VC) += snd-soc-cq93vc.o
-<<<<<<< HEAD
 obj-$(CONFIG_SND_SOC_CPCAP)	+= snd-soc-cpcap.o
 obj-$(CONFIG_SND_SOC_CROS_EC_CODEC)	+= snd-soc-cros-ec-codec.o
 obj-$(CONFIG_SND_SOC_CS35L32)	+= snd-soc-cs35l32.o
@@ -431,15 +421,7 @@ obj-$(CONFIG_SND_SOC_CS35L45)	+= snd-soc-cs35l45.o
 obj-$(CONFIG_SND_SOC_CS35L45_SPI)	+= snd-soc-cs35l45-spi.o
 obj-$(CONFIG_SND_SOC_CS35L45_I2C)	+= snd-soc-cs35l45-i2c.o
 obj-$(CONFIG_SND_SOC_CS42L42)	+= snd-soc-cs42l42.o
-=======
-obj-$(CONFIG_SND_SOC_RT56XX) += snd-soc-rt56xx.o
-obj-$(CONFIG_SND_SOC_RT5640) += snd-soc-rt5640.o
-obj-$(CONFIG_SND_SOC_RT5642) += snd-soc-rt5642.o
-obj-$(CONFIG_SND_SOC_RT5651) += snd-soc-rt5651.o
-obj-$(CONFIG_SND_SOC_RT5659) += snd-soc-rt5659.o
-obj-$(CONFIG_SND_SOC_RT5672) += snd-soc-rt5672.o
 obj-$(CONFIG_SND_SOC_TFA98xx) += snd-soc-tfa98xx.o
->>>>>>> 1b02223e853c (Import sound changes for latte)
 obj-$(CONFIG_SND_SOC_CS42L51)	+= snd-soc-cs42l51.o
 obj-$(CONFIG_SND_SOC_CS42L51_I2C)	+= snd-soc-cs42l51-i2c.o
 obj-$(CONFIG_SND_SOC_CS42L52)	+= snd-soc-cs42l52.o
