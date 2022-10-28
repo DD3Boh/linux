@@ -1565,13 +1565,9 @@ static void intel_encoders_pre_pll_enable(struct intel_atomic_state *state,
 		if (conn_state->crtc != &crtc->base)
 			continue;
 
-		if (encoder->pre_pll_enable) {
-			if (encoder->type == INTEL_OUTPUT_DSI && dev_priv->quick_modeset)
-						continue;
-
+		if (encoder->pre_pll_enable)
 			encoder->pre_pll_enable(state, encoder,
 						crtc_state, conn_state);
-		}
 	}
 }
 
@@ -1591,12 +1587,9 @@ static void intel_encoders_pre_enable(struct intel_atomic_state *state,
 		if (conn_state->crtc != &crtc->base)
 			continue;
 
-		if (encoder->pre_enable) {
-			if (encoder->type == INTEL_OUTPUT_DSI && dev_priv->quick_modeset)
-						continue;
+		if (encoder->pre_enable)
 			encoder->pre_enable(state, encoder,
 					    crtc_state, conn_state);
-		}
 	}
 }
 
@@ -1616,13 +1609,9 @@ static void intel_encoders_enable(struct intel_atomic_state *state,
 		if (conn_state->crtc != &crtc->base)
 			continue;
 
-		if (encoder->enable) {
-			if (encoder->type == INTEL_OUTPUT_DSI && dev_priv->quick_modeset)
-						continue;
-
+		if (encoder->enable)
 			encoder->enable(state, encoder,
 					crtc_state, conn_state);
-		}
 		intel_opregion_notify_encoder(encoder, true);
 	}
 }
@@ -1644,13 +1633,9 @@ static void intel_encoders_disable(struct intel_atomic_state *state,
 			continue;
 
 		intel_opregion_notify_encoder(encoder, false);
-		if (encoder->disable) {
-			if (encoder->type == INTEL_OUTPUT_DSI && dev_priv->quick_modeset)
-						continue;
-
+		if (encoder->disable)
 			encoder->disable(state, encoder,
 					 old_crtc_state, old_conn_state);
-		}
 	}
 }
 
@@ -1670,13 +1655,9 @@ static void intel_encoders_post_disable(struct intel_atomic_state *state,
 		if (old_conn_state->crtc != &crtc->base)
 			continue;
 
-		if (encoder->post_disable) {
-			if (encoder->type == INTEL_OUTPUT_DSI && dev_priv->quick_modeset)
-						continue;
-
+		if (encoder->post_disable)
 			encoder->post_disable(state, encoder,
 					      old_crtc_state, old_conn_state);
-		}
 	}
 }
 
@@ -1696,13 +1677,9 @@ static void intel_encoders_post_pll_disable(struct intel_atomic_state *state,
 		if (old_conn_state->crtc != &crtc->base)
 			continue;
 
-		if (encoder->post_pll_disable) {
-			if (encoder->type == INTEL_OUTPUT_DSI && dev_priv->quick_modeset)
-						continue;
-
+		if (encoder->post_pll_disable)
 			encoder->post_pll_disable(state, encoder,
 						  old_crtc_state, old_conn_state);
-		}
 	}
 }
 
