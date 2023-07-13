@@ -33,6 +33,7 @@
 #include <linux/debugfs.h>
 #include <linux/cpuhotplug.h>
 #include <linux/part_stat.h>
+#include <linux/jiffies.h>
 
 #include "zram_drv.h"
 
@@ -340,6 +341,12 @@ out_unlock:
 out:
 	return rv;
 }
+
+struct zram_auto_work {
+	struct delayed_work idle_work;
+	struct zram *zram;
+	u64 idle_delay;
+};
 
 #ifdef CONFIG_ZRAM_WRITEBACK
 static ssize_t writeback_limit_enable_store(struct device *dev,
@@ -930,6 +937,54 @@ static void zram_debugfs_unregister(struct zram *zram)
 {
 	debugfs_remove_recursive(zram->debugfs_dir);
 }
+
+#define ZRAM_AUTO_IDLE_DEFAULT		7200
+
+static void zram_auto_idle(struct work_struct *work)
+{
+	struct zram_auto_work *zw = container_of(to_delayed_work(work),
+				struct zram_auto_work, idle_work);
+	ktime_t cutoff_time = 0;
+
+	if (zw->idle_delay < 0)
+		return;
+
+	cutoff_time = ktime_sub(ktime_get_boottime(),
+			ns_to_ktime(zw->idle_delay * NSEC_PER_SEC));
+
+	down_read(&zw->zram->init_lock);
+
+	if (!init_done(zw->zram)) {
+		up_read(&zw->zram->init_lock);
+		return;
+	}
+
+	mark_idle(zw->zram, cutoff_time);
+
+	queue_delayed_work(system_unbound_wq, &zw->idle_work, msecs_to_jiffies(zw->idle_delay * MSEC_PER_SEC));
+}
+
+static ssize_t auto_idle_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	struct zram_auto_work *zw;
+
+	if (!sysfs_streq(buf, "default")) {
+		u64 age_sec;
+
+		if (kstrtoull(buf, 0, &age_sec))
+			return -EINVAL;
+
+		zw->idle_delay = age_sec;
+	} else
+		zw->idle_delay = ZRAM_AUTO_IDLE_DEFAULT;
+
+	if (zw->idle_delay > 0)
+		queue_delayed_work(system_unbound_wq, &zw->idle_work, 0);
+
+	return len;
+}
+
 #else
 static void zram_debugfs_create(void) {};
 static void zram_debugfs_destroy(void) {};
@@ -2138,6 +2193,9 @@ static DEVICE_ATTR_RW(writeback_limit_enable);
 static DEVICE_ATTR_RW(recomp_algorithm);
 static DEVICE_ATTR_WO(recompress);
 #endif
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+static DEVICE_ATTR_WO(auto_idle);
+#endif
 
 static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_disksize.attr,
@@ -2164,6 +2222,9 @@ static struct attribute *zram_disk_attrs[] = {
 #ifdef CONFIG_ZRAM_MULTI_COMP
 	&dev_attr_recomp_algorithm.attr,
 	&dev_attr_recompress.attr,
+#endif
+#ifdef CONFIG_ZRAM_WRITEBACK
+	&dev_attr_auto_idle.attr,
 #endif
 	NULL,
 };
@@ -2384,16 +2445,21 @@ static int zram_remove_cb(int id, void *ptr, void *data)
 
 static void destroy_devices(void)
 {
+	struct zram_auto_work work;
+
 	class_unregister(&zram_control_class);
 	idr_for_each(&zram_index_idr, &zram_remove_cb, NULL);
 	zram_debugfs_destroy();
 	idr_destroy(&zram_index_idr);
 	unregister_blkdev(zram_major, "zram");
 	cpuhp_remove_multi_state(CPUHP_ZCOMP_PREPARE);
+	cancel_delayed_work(&work.idle_work);
+	flush_delayed_work(&work.idle_work);
 }
 
 static int __init zram_init(void)
 {
+	struct zram_auto_work work;
 	int ret;
 
 	BUILD_BUG_ON(__NR_ZRAM_PAGEFLAGS > BITS_PER_LONG);
@@ -2427,6 +2493,10 @@ static int __init zram_init(void)
 			goto out_error;
 		num_devices--;
 	}
+
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+	INIT_DELAYED_WORK(&work.idle_work, zram_auto_idle);
+#endif
 
 	return 0;
 
