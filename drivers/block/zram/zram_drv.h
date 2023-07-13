@@ -138,6 +138,8 @@ struct zram {
 #endif
 #ifdef CONFIG_ZRAM_MEMORY_TRACKING
 	struct dentry *debugfs_dir;
+	struct delayed_work idle_work;
+	u64 idle_delay;
 #endif
 };
 #endif
