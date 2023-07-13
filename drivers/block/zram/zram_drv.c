@@ -949,16 +949,21 @@ static void zram_auto_idle(struct work_struct *work)
 	if (zw->idle_delay < 0)
 		return;
 
+	pr_err("zram: auto idle worker\n");
+
 	cutoff_time = ktime_sub(ktime_get_boottime(),
 			ns_to_ktime(zw->idle_delay * NSEC_PER_SEC));
 
+	pr_err("zram: set down_read\n");
 	down_read(&zw->zram->init_lock);
 
 	if (!init_done(zw->zram)) {
+		pr_err("zram: ! init done\n");
 		up_read(&zw->zram->init_lock);
 		return;
 	}
 
+	pr_err("zram: before mark idle\n");
 	mark_idle(zw->zram, cutoff_time);
 
 	queue_delayed_work(system_unbound_wq, &zw->idle_work, msecs_to_jiffies(zw->idle_delay * MSEC_PER_SEC));
@@ -975,12 +980,17 @@ static ssize_t auto_idle_store(struct device *dev,
 		if (kstrtoull(buf, 0, &age_sec))
 			return -EINVAL;
 
+		pr_err("zram: auto_idle: Setting idle_delay to age_sec, %llu\n", age_sec);
 		zw->idle_delay = age_sec;
-	} else
+	} else {
+		pr_err("zram: auto_idle: Setting default value\n");
 		zw->idle_delay = ZRAM_AUTO_IDLE_DEFAULT;
+	}
 
-	if (zw->idle_delay > 0)
+	if (zw->idle_delay > 0) {
+		pr_err("zram: auto_idle: Scheduling idle work\n");
 		queue_delayed_work(system_unbound_wq, &zw->idle_work, 0);
+	}
 
 	return len;
 }
