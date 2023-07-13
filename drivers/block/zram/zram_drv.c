@@ -33,6 +33,7 @@
 #include <linux/debugfs.h>
 #include <linux/cpuhotplug.h>
 #include <linux/part_stat.h>
+#include <linux/jiffies.h>
 
 #include "zram_drv.h"
 
@@ -930,6 +931,54 @@ static void zram_debugfs_unregister(struct zram *zram)
 {
 	debugfs_remove_recursive(zram->debugfs_dir);
 }
+
+#define ZRAM_AUTO_IDLE_DEFAULT		7200
+
+static void zram_auto_idle(struct work_struct *work)
+{
+	struct zram *zram = container_of(to_delayed_work(work),
+				struct zram, idle_work);
+	ktime_t cutoff_time = 0;
+
+	if (zram->idle_delay < 0)
+		return;
+
+	cutoff_time = ktime_sub(ktime_get_boottime(),
+			ns_to_ktime(zram->idle_delay * NSEC_PER_SEC));
+
+	down_read(&zram->init_lock);
+
+	if (!init_done(zram)) {
+		up_read(&zram->init_lock);
+		return;
+	}
+
+	mark_idle(zram, cutoff_time);
+
+	queue_delayed_work(system_unbound_wq, &zram->idle_work, msecs_to_jiffies(zram->idle_delay * MSEC_PER_SEC));
+}
+
+static ssize_t auto_idle_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	struct zram *zram = dev_to_zram(dev);
+
+	if (!sysfs_streq(buf, "default")) {
+		u64 age_sec;
+
+		if (kstrtoull(buf, 0, &age_sec))
+			return -EINVAL;
+
+		zram->idle_delay = age_sec;
+	} else
+		zram->idle_delay = ZRAM_AUTO_IDLE_DEFAULT;
+
+	if (zram->idle_delay > 0)
+		queue_delayed_work(system_unbound_wq, &zram->idle_work, 0);
+
+	return len;
+}
+
 #else
 static void zram_debugfs_create(void) {};
 static void zram_debugfs_destroy(void) {};
@@ -2138,6 +2187,9 @@ static DEVICE_ATTR_RW(writeback_limit_enable);
 static DEVICE_ATTR_RW(recomp_algorithm);
 static DEVICE_ATTR_WO(recompress);
 #endif
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+static DEVICE_ATTR_WO(auto_idle);
+#endif
 
 static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_disksize.attr,
@@ -2164,6 +2216,9 @@ static struct attribute *zram_disk_attrs[] = {
 #ifdef CONFIG_ZRAM_MULTI_COMP
 	&dev_attr_recomp_algorithm.attr,
 	&dev_attr_recompress.attr,
+#endif
+#ifdef CONFIG_ZRAM_WRITEBACK
+	&dev_attr_auto_idle.attr,
 #endif
 	NULL,
 };
@@ -2246,6 +2301,11 @@ static int zram_add(void)
 
 	comp_algorithm_set(zram, ZRAM_PRIMARY_COMP, default_compressor);
 
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+	zram->idle_delay = 0;
+	INIT_DELAYED_WORK(&zram->idle_work, zram_auto_idle);
+#endif
+
 	zram_debugfs_register(zram);
 	pr_info("Added device: %s\n", zram->disk->disk_name);
 	return device_id;
@@ -2275,6 +2335,11 @@ static int zram_remove(struct zram *zram)
 	mutex_unlock(&zram->disk->open_mutex);
 
 	zram_debugfs_unregister(zram);
+
+#ifdef CONFIG_ZRAM_MEMORY_TRACKING
+	cancel_delayed_work(&zram->idle_work);
+	flush_delayed_work(&zram->idle_work);
+#endif
 
 	if (claimed) {
 		/*
