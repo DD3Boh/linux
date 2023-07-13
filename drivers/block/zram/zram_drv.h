@@ -135,6 +135,10 @@ struct zram {
 	struct block_device *bdev;
 	unsigned long *bitmap;
 	unsigned long nr_pages;
+	const char* auto_writeback_mode;
+	struct delayed_work wb_work;
+	struct device *wb_dev;
+	struct device_attribute *wb_attr;
 #endif
 #ifdef CONFIG_ZRAM_MEMORY_TRACKING
 	struct dentry *debugfs_dir;

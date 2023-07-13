@@ -820,6 +820,68 @@ static int read_from_bdev(struct zram *zram, struct page *page,
 	read_from_bdev_async(zram, page, entry, parent);
 	return 0;
 }
+
+const char* auto_writeback_values[] = {
+	"idle",
+	"huge",
+	"huge_idle",
+	"incompressible"
+};
+
+static void zram_auto_writeback(struct work_struct *work)
+{
+	struct zram *zram = container_of(to_delayed_work(work),
+				struct zram, wb_work);
+	u64 delay = 30;
+
+	if (strcmp(zram->auto_writeback_mode, "idle") && zram->idle_delay != 0)
+		delay = zram->idle_delay;
+
+	if (!init_done(zram)) {
+		up_read(&zram->init_lock);
+		return;
+	}
+
+	writeback_store(zram->wb_dev, zram->wb_attr, zram->auto_writeback_mode,
+			strlen(zram->auto_writeback_mode));
+
+	queue_delayed_work(system_unbound_wq, &zram->wb_work, msecs_to_jiffies(delay * MSEC_PER_SEC));
+}
+
+#define MAX_NODE_NAME_LENGTH 15
+
+static ssize_t auto_writeback_show(struct device *dev,
+		struct device_attribute *attr, char *buf)
+{
+	struct zram *zram = dev_to_zram(dev);
+
+	return scnprintf(buf, PAGE_SIZE, "%s\n", zram->auto_writeback_mode);
+}
+
+static ssize_t auto_writeback_store(struct device *dev,
+		struct device_attribute *attr, const char *buf, size_t len)
+{
+	struct zram *zram = dev_to_zram(dev);
+    int i;
+	zram->wb_dev = dev;
+	zram->wb_attr = attr;
+
+    for (i = 0; i < ARRAY_SIZE(auto_writeback_values); ++i) {
+        if (sysfs_streq(buf, auto_writeback_values[i])) {
+			zram->auto_writeback_mode = auto_writeback_values[i];
+			break;
+        }
+    }
+
+	if (zram->auto_writeback_mode == NULL) {
+		pr_err("Invalid auto writeback mode: %s\n", buf);
+		return -EINVAL;
+	}
+
+	queue_delayed_work(system_unbound_wq, &zram->wb_work, 0);
+
+	return len;
+}
 #else
 static inline void reset_bdev(struct zram *zram) {};
 static int read_from_bdev(struct zram *zram, struct page *page,
@@ -2177,6 +2239,7 @@ static DEVICE_ATTR_WO(idle);
 static DEVICE_ATTR_RW(max_comp_streams);
 static DEVICE_ATTR_RW(comp_algorithm);
 #ifdef CONFIG_ZRAM_WRITEBACK
+static DEVICE_ATTR_RW(auto_writeback);
 static DEVICE_ATTR_RW(backing_dev);
 static DEVICE_ATTR_WO(writeback);
 static DEVICE_ATTR_RW(writeback_limit);
@@ -2201,6 +2264,7 @@ static struct attribute *zram_disk_attrs[] = {
 	&dev_attr_max_comp_streams.attr,
 	&dev_attr_comp_algorithm.attr,
 #ifdef CONFIG_ZRAM_WRITEBACK
+	&dev_attr_auto_writeback.attr,
 	&dev_attr_backing_dev.attr,
 	&dev_attr_writeback.attr,
 	&dev_attr_writeback_limit.attr,
@@ -2305,6 +2369,11 @@ static int zram_add(void)
 	INIT_DELAYED_WORK(&zram->idle_work, zram_auto_idle);
 #endif
 
+#ifdef CONFIG_ZRAM_WRITEBACK
+	zram->auto_writeback_mode = NULL;
+	INIT_DELAYED_WORK(&zram->wb_work, zram_auto_writeback);
+#endif
+
 	zram_debugfs_register(zram);
 	pr_info("Added device: %s\n", zram->disk->disk_name);
 	return device_id;
@@ -2337,6 +2406,10 @@ static int zram_remove(struct zram *zram)
 
 #ifdef CONFIG_ZRAM_MEMORY_TRACKING
 	cancel_delayed_work_sync(&zram->idle_work);
+#endif
+
+#ifdef CONFIG_ZRAM_WRITEBACK
+	cancel_delayed_work_sync(&zram->wb_work);
 #endif
 
 	if (claimed) {
