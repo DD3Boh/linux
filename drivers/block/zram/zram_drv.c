@@ -842,6 +842,9 @@ static void zram_auto_writeback(struct work_struct *work)
 		return;
 	}
 
+	pr_err("%s: auto writeback mode: %s\n", __func__,
+			zram->auto_writeback_mode);
+
 	writeback_store(zram->wb_dev, zram->wb_attr, zram->auto_writeback_mode,
 			strlen(zram->auto_writeback_mode));
 
@@ -1015,6 +1018,7 @@ static void zram_auto_idle(struct work_struct *work)
 		return;
 	}
 
+	pr_err("zram%d: auto idle\n", zram->index);
 	mark_idle(zram, cutoff_time);
 
 	queue_delayed_work(system_unbound_wq, &zram->idle_work, msecs_to_jiffies(zram->idle_delay * MSEC_PER_SEC));
