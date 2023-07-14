@@ -822,6 +822,7 @@ static int read_from_bdev(struct zram *zram, struct page *page,
 }
 
 const char* auto_writeback_values[] = {
+	"none",
 	"idle",
 	"huge",
 	"huge_idle",
@@ -833,6 +834,12 @@ static void zram_auto_writeback(struct work_struct *work)
 	struct zram *zram = container_of(to_delayed_work(work),
 				struct zram, wb_work);
 	u64 delay = 30;
+
+	if (strcmp(zram->auto_writeback_mode, "none")) {
+		pr_err("%s: auto writeback mode: %s\n", __func__,
+				zram->auto_writeback_mode);
+		return;
+	}
 
 	if (strcmp(zram->auto_writeback_mode, "idle") && zram->idle_delay != 0)
 		delay = zram->idle_delay;
@@ -1018,7 +1025,7 @@ static void zram_auto_idle(struct work_struct *work)
 		return;
 	}
 
-	pr_err("zram%d: auto idle\n", zram->index);
+	pr_err("zram: auto idle\n");
 	mark_idle(zram, cutoff_time);
 
 	queue_delayed_work(system_unbound_wq, &zram->idle_work, msecs_to_jiffies(zram->idle_delay * MSEC_PER_SEC));
